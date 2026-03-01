@@ -50,6 +50,27 @@ display_message() {
 	tmux set-option -gq display-time "$saved_display_time"
 }
 
+# ── Logging ────────────────────────────────────────────────────────
+
+# Daily log file: frost_YYYY-MM-DD.log in the frost directory.
+# Keeps only the last 10 days of logs.
+
+frost_log() {
+	local level="$1"
+	shift
+	local dir
+	dir="$(frost_dir)"
+	mkdir -p "$dir"
+	local log_file="$dir/frost_$(date +%Y-%m-%d).log"
+	echo "$(date +%H:%M:%S) [$level] $*" >> "$log_file"
+}
+
+rotate_logs() {
+	local dir
+	dir="$(frost_dir)"
+	find "$dir" -name "frost_*.log" -type f -mtime +10 -delete 2>/dev/null
+}
+
 # Acquire an exclusive lock (non-blocking). Returns 1 if lock held by another.
 # Uses flock on fd 9 — released automatically when the process exits.
 acquire_lock() {

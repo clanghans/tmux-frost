@@ -20,42 +20,32 @@ set_freeze_binding() {
 set_thaw_binding() {
 	local key
 	key="$(get_tmux_option "@frost-restore-key" "C-r")"
-	tmux bind-key "$key" run-shell "$CURRENT_DIR/scripts/thaw.sh"
+	# run-shell -b launches thaw in background, wait-for blocks the client
+	# until thaw signals completion — making tmux "busy" during restore.
+	tmux bind-key "$key" \
+		run-shell -b "'$CURRENT_DIR/scripts/thaw.sh' ; tmux wait-for -S frost-thaw" \; \
+		wait-for frost-thaw
 }
 
 # ── Auto-save ───────────────────────────────────────────────────────
 
-# Uses the tmux status-right #() trick (same pattern as tmux-continuum):
-# A shell command is embedded in status-right that checks elapsed time
-# and triggers a save when the interval has passed.
+# Background loop that saves at a fixed interval.
+# The loop is a child of the tmux server, so it dies on normal exit.
+# A PID file prevents duplicates on config reloads.
 
-auto_save_script() {
-	cat <<'AUTOSAVE'
-frost_dir="FROST_DIR_PLACEHOLDER"
-interval="INTERVAL_PLACEHOLDER"
-freeze_script="FREEZE_SCRIPT_PLACEHOLDER"
+stop_auto_save() {
+	local dir
+	dir="$(frost_dir)"
+	local pid_file="$dir/.auto_save.pid"
 
-# 0 means disabled
-[ "$interval" -eq 0 ] 2>/dev/null && exit 0
-
-stamp_file="$frost_dir/.last_auto_save"
-mkdir -p "$frost_dir"
-
-now="$(date +%s)"
-if [ -f "$stamp_file" ]; then
-    last="$(cat "$stamp_file")"
-else
-    last=0
-fi
-
-elapsed=$(( now - last ))
-threshold=$(( interval * 60 ))
-
-if [ "$elapsed" -ge "$threshold" ]; then
-    echo "$now" > "$stamp_file"
-    "$freeze_script" quiet &
-fi
-AUTOSAVE
+	if [ -f "$pid_file" ]; then
+		local old_pid
+		old_pid="$(cat "$pid_file")"
+		if kill -0 "$old_pid" 2>/dev/null; then
+			kill "$old_pid" 2>/dev/null
+		fi
+		rm -f "$pid_file"
+	fi
 }
 
 setup_auto_save() {
@@ -64,35 +54,42 @@ setup_auto_save() {
 
 	# 0 means disabled
 	if [ "$interval" = "0" ]; then
+		stop_auto_save
 		return
 	fi
 
 	local dir
 	dir="$(frost_dir)"
+	local pid_file="$dir/.auto_save.pid"
 	local freeze_script="$CURRENT_DIR/scripts/freeze.sh"
 
-	# Write the auto-save helper script
 	mkdir -p "$dir"
-	local auto_save_file="$dir/.auto_save.sh"
 
-	auto_save_script | \
-		sed "s|FROST_DIR_PLACEHOLDER|${dir}|g; s|INTERVAL_PLACEHOLDER|${interval}|g; s|FREEZE_SCRIPT_PLACEHOLDER|${freeze_script}|g" \
-		> "$auto_save_file"
-	chmod +x "$auto_save_file"
-
-	# Append to status-right (hidden — produces no visible output)
-	local current_status_right
-	current_status_right="$(tmux show-option -gqv status-right)"
-
-	# Don't add twice
-	if [[ "$current_status_right" != *"frost"* ]]; then
-		tmux set-option -gq status-right "${current_status_right}#(${auto_save_file})"
+	# If a loop is already running, leave it alone
+	if [ -f "$pid_file" ]; then
+		local old_pid
+		old_pid="$(cat "$pid_file")"
+		if kill -0 "$old_pid" 2>/dev/null; then
+			frost_log INFO "auto-save loop already running (pid $old_pid)"
+			return
+		fi
 	fi
+
+	# Start the background save loop
+	(
+		while true; do
+			sleep "$((interval * 60))"
+			"$freeze_script" quiet
+		done
+	) &
+	echo $! > "$pid_file"
+	frost_log INFO "auto-save loop started (pid $!, interval ${interval}m)"
 }
 
 # ── Main ───────────────────────────────────────────────────────────
 
 main() {
+	frost_log INFO "plugin loaded"
 	set_freeze_binding
 	set_thaw_binding
 	setup_auto_save

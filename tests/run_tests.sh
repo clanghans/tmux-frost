@@ -525,71 +525,70 @@ test_state_line_captures_session() {
     fi
 }
 
-test_auto_save_script_generation() {
-    section "Auto-save script generation"
+test_auto_save_background_loop() {
+    section "Auto-save background loop"
 
     local dir="$SAVE_DIR/auto_test"
+    rm -rf "$dir"
     mkdir -p "$dir"
-    local freeze_script="$FROST_DIR/scripts/freeze.sh"
-    local interval=15
+    local pid_file="$dir/.auto_save.pid"
 
-    # Generate the script the same way frost.tmux does
-    local auto_save_file="$dir/.auto_save.sh"
-    cat <<'AUTOSAVE' | sed "s|FROST_DIR_PLACEHOLDER|${dir}|g; s|INTERVAL_PLACEHOLDER|${interval}|g; s|FREEZE_SCRIPT_PLACEHOLDER|${freeze_script}|g" > "$auto_save_file"
-frost_dir="FROST_DIR_PLACEHOLDER"
-interval="INTERVAL_PLACEHOLDER"
-freeze_script="FREEZE_SCRIPT_PLACEHOLDER"
+    # Start a short-lived background loop (1 second interval for testing)
+    (
+        while true; do
+            sleep 1
+            echo "tick" >> "$dir/.ticks"
+        done
+    ) &
+    local loop_pid=$!
+    echo "$loop_pid" > "$pid_file"
 
-[ "$interval" -eq 0 ] 2>/dev/null && exit 0
-
-stamp_file="$frost_dir/.last_auto_save"
-mkdir -p "$frost_dir"
-
-now="$(date +%s)"
-if [ -f "$stamp_file" ]; then
-    last="$(cat "$stamp_file")"
-else
-    last=0
-fi
-
-elapsed=$(( now - last ))
-threshold=$(( interval * 60 ))
-
-if [ "$elapsed" -ge "$threshold" ]; then
-    echo "$now" > "$stamp_file"
-    "$freeze_script" quiet &
-fi
-AUTOSAVE
-    chmod +x "$auto_save_file"
-
-    if grep -q "$dir" "$auto_save_file"; then
-        pass "frost_dir placeholder replaced"
+    # Loop should be running
+    if kill -0 "$loop_pid" 2>/dev/null; then
+        pass "background loop is running"
     else
-        fail "frost_dir placeholder NOT replaced"
+        fail "background loop not running"
     fi
 
-    if grep -q "interval=\"15\"" "$auto_save_file"; then
-        pass "interval placeholder replaced"
+    # PID file written
+    if [ -f "$pid_file" ]; then
+        pass "PID file created"
     else
-        fail "interval placeholder NOT replaced"
+        fail "PID file not created"
     fi
 
-    if grep -q "$freeze_script" "$auto_save_file"; then
-        pass "freeze_script placeholder replaced"
+    # PID file contains correct PID
+    local stored_pid
+    stored_pid="$(cat "$pid_file")"
+    if [ "$stored_pid" = "$loop_pid" ]; then
+        pass "PID file contains correct PID"
     else
-        fail "freeze_script placeholder NOT replaced"
+        fail "PID file has '$stored_pid', expected '$loop_pid'"
     fi
 
-    if grep -q "PLACEHOLDER" "$auto_save_file"; then
-        fail "unreplaced PLACEHOLDER found"
+    # Duplicate detection: check PID is still alive
+    if kill -0 "$stored_pid" 2>/dev/null; then
+        pass "duplicate check: existing loop detected as alive"
     else
-        pass "no unreplaced placeholders"
+        fail "duplicate check: existing loop not detected"
     fi
 
-    if bash -n "$auto_save_file" 2>/dev/null; then
-        pass "auto-save script is valid bash"
+    # Wait for at least one tick
+    sleep 1.5
+    if [ -f "$dir/.ticks" ]; then
+        pass "loop executed at least one tick"
     else
-        fail "auto-save script has syntax errors"
+        fail "loop did not tick"
+    fi
+
+    # Clean shutdown
+    kill "$loop_pid" 2>/dev/null
+    wait "$loop_pid" 2>/dev/null || true
+
+    if ! kill -0 "$loop_pid" 2>/dev/null; then
+        pass "loop stopped after kill"
+    else
+        fail "loop still running after kill"
     fi
 }
 
@@ -707,7 +706,7 @@ test_pane_cwd_captured
 test_backup_retention
 test_thaw_rejects_missing_file
 test_state_line_captures_session
-test_auto_save_script_generation
+test_auto_save_background_loop
 test_locking
 test_idempotent_save
 test_multiple_cycles

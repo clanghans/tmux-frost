@@ -144,15 +144,27 @@ save_all() {
 
 main() {
 	if ! acquire_lock; then
-		# Another frost operation is in progress
+		frost_log WARN "freeze skipped — lock held by another process"
 		return 0
 	fi
+
+	local mode="manual"
+	[ "$SCRIPT_OUTPUT" = "quiet" ] && mode="auto"
+
+	frost_log INFO "freeze started (${mode})"
 
 	if [ "$SCRIPT_OUTPUT" != "quiet" ]; then
 		display_message "Frost: saving..."
 	fi
 
 	save_all
+
+	local sessions panes
+	sessions="$(tmux list-sessions 2>/dev/null | wc -l | tr -d ' ')"
+	panes="$(tmux list-panes -a 2>/dev/null | wc -l | tr -d ' ')"
+	frost_log INFO "freeze complete — ${sessions} sessions, ${panes} panes"
+
+	rotate_logs
 
 	if [ "$SCRIPT_OUTPUT" != "quiet" ]; then
 		display_message "Frost: saved!"

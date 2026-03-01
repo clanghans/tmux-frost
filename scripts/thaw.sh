@@ -166,6 +166,7 @@ main() {
 	save_file="$(last_frost_file)"
 
 	if [ ! -L "$save_file" ] && [ ! -f "$save_file" ]; then
+		frost_log ERROR "thaw failed — no save file found"
 		display_message "Frost: no save file found!"
 		return 1
 	fi
@@ -174,6 +175,7 @@ main() {
 	local actual_file
 	actual_file="$(readlink -f "$save_file")"
 	if [ ! -f "$actual_file" ]; then
+		frost_log ERROR "thaw failed — save file missing: $actual_file"
 		display_message "Frost: save file missing!"
 		return 1
 	fi
@@ -182,14 +184,18 @@ main() {
 	local first_line
 	first_line="$(head -1 "$actual_file")"
 	if [[ "$first_line" != frost_version* ]]; then
+		frost_log ERROR "thaw failed — invalid save file: $actual_file"
 		display_message "Frost: invalid save file!"
 		return 1
 	fi
 
 	if ! acquire_lock; then
+		frost_log WARN "thaw skipped — lock held by another process"
 		display_message "Frost: another operation in progress"
 		return 0
 	fi
+
+	frost_log INFO "thaw started from $(basename "$actual_file")"
 
 	display_message "Frost: restoring..."
 
@@ -198,6 +204,11 @@ main() {
 	restore_active_panes "$actual_file"
 	restore_active_windows "$actual_file"
 	restore_state "$actual_file"
+
+	local sessions panes
+	sessions="$(tmux list-sessions 2>/dev/null | wc -l | tr -d ' ')"
+	panes="$(tmux list-panes -a 2>/dev/null | wc -l | tr -d ' ')"
+	frost_log INFO "thaw complete — ${sessions} sessions, ${panes} panes"
 
 	display_message "Frost: restored!"
 }
