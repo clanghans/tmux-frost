@@ -75,16 +75,11 @@ setup_auto_save() {
 		fi
 	fi
 
-	# Start the background save loop
-	(
-		while true; do
-			sleep "$((interval * 60))"
-			"$freeze_script" quiet
-		done
-	) </dev/null >/dev/null 2>&1 &
-	disown
-	echo $! > "$pid_file"
-	frost_log INFO "auto-save loop started (pid $!, interval ${interval}m)"
+	# Start the background save loop via tmux so it's not a child of this
+	# script — TPM waits for the entire process group to exit, so spawning
+	# a long-lived child here would freeze the install.
+	tmux run-shell -b "echo \$\$ > '$pid_file' && while true; do sleep $((interval * 60)); '$freeze_script' quiet; done"
+	frost_log INFO "auto-save loop started (interval ${interval}m)"
 }
 
 # ── Auto-restore ───────────────────────────────────────────────────
