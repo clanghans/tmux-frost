@@ -2,9 +2,21 @@
 
 Minimal tmux session save/restore. Freeze your sessions, thaw them later.
 
+## Why
+
+I've been using tmux daily for over five years and was pretty happy with tmux-resurrect and tmux-continuum for most of that time. But a few things always bugged me:
+
+1. **continuum hijacks `status-right`** — my theme would constantly overwrite it, breaking auto-save or vice versa.
+2. **resurrect's stacked-pane bug** — restored layouts often leave panes with a height of 1, and the project has been effectively unmaintained for a while now.
+3. **Two plugins for one job** — needing both resurrect *and* continuum just to save and restore sessions felt like unnecessary complexity.
+4. **Too many features I don't use** — process restoration, strategy hooks, and other extras add weight I never needed. I just want my windows, panes, and layouts back.
+
+tmux-frost is a single plugin that does save, restore, and auto-save/restore with none of the baggage.
+
 ## Features
 
 - **Save & restore** all sessions, windows, panes, and layouts
+- **Auto-restore** on server start — previous layout restored automatically
 - **Auto-save** at a configurable interval (default: 15 min)
 - **Stacked-pane fix** — detects broken layouts at save time and replaces them with `tiled`
 - **Dedup** — identical saves don't create new files
@@ -59,6 +71,9 @@ Set these in `~/.tmux.conf` before loading the plugin:
 set -g @frost-save-key 'C-s'        # default: C-s
 set -g @frost-restore-key 'C-r'     # default: C-r
 
+# Auto-restore on server start ('on' or 'off')
+set -g @frost-auto-restore 'on'       # default: on
+
 # Auto-save interval in minutes (0 to disable)
 set -g @frost-auto-save-interval '15'  # default: 15
 
@@ -81,6 +96,10 @@ state	client_session	client_last_session
 ```
 
 Files are stored as `frost_YYYYMMDDTHHMMSS.txt` with a `last` symlink pointing to the most recent save.
+
+## How auto-restore works
+
+When the plugin loads, it registers a one-shot `session-created` hook. The first time a session is created (i.e. tmux just started), the hook checks if the server is fresh (only 1 pane exists) and a save file is available. If so, it runs thaw to restore the previous layout. The hook removes itself immediately so it never fires again during the server's lifetime.
 
 ## How auto-save works
 
