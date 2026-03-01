@@ -66,7 +66,6 @@ restore_all_panes() {
 	fi
 
 	local restored_session_0=false
-	local first_pane_of_session=""
 
 	while IFS=$d read -r line_type session_name window_number window_active pane_index pane_title dir pane_active; do
 		[ "$line_type" = "pane" ] || continue
@@ -79,15 +78,10 @@ restore_all_panes() {
 
 		if ! session_exists "$session_name"; then
 			new_session "$session_name" "$window_number" "$dir"
-			first_pane_of_session="${session_name}:${window_number}"
+			# first pane already created by new-session — just set title
 		elif ! window_exists "$session_name" "$window_number"; then
 			new_window "$session_name" "$window_number" "$dir"
-		elif [ "${session_name}:${window_number}" = "$first_pane_of_session" ]; then
-			# Skip the first pane of a session — it was created with new_session
-			first_pane_of_session=""
-			# Set pane title on the already-created pane
-			tmux select-pane -t "${session_name}:${window_number}" -T "$pane_title"
-			continue
+			# first pane already created by new-window — just set title
 		else
 			new_pane "$session_name" "$window_number" "$dir"
 		fi

@@ -86,12 +86,28 @@ setup_auto_save() {
 	frost_log INFO "auto-save loop started (pid $!, interval ${interval}m)"
 }
 
+# ── Auto-restore ───────────────────────────────────────────────────
+
+# Register a one-shot session-created hook that restores on first
+# session, then removes itself.  This defers thaw until tmux is
+# fully initialised and ready to create sessions/windows/panes.
+
+setup_auto_restore() {
+	local enabled
+	enabled="$(get_tmux_option "@frost-auto-restore" "on")"
+	[ "$enabled" = "on" ] || return
+
+	tmux set-hook -g session-created \
+		"run-shell '\"$CURRENT_DIR/scripts/auto-restore.sh\" \"$CURRENT_DIR\"'"
+}
+
 # ── Main ───────────────────────────────────────────────────────────
 
 main() {
 	frost_log INFO "plugin loaded"
 	set_freeze_binding
 	set_thaw_binding
+	setup_auto_restore
 	setup_auto_save
 }
 main
