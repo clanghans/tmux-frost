@@ -34,7 +34,7 @@ tmux-frost is a single plugin that does save, restore, and auto-save/restore wit
 Add to `~/.tmux.conf`:
 
 ```tmux
-set -g @plugin 'chris/tmux-frost'
+set -g @plugin 'clanghans/tmux-frost'
 ```
 
 Then reload tmux and press `prefix + I` to install.
