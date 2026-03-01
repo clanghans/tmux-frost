@@ -61,21 +61,28 @@ setup_auto_save() {
 
 	mkdir -p "$dir"
 
-	# If a loop is already running, leave it alone
+	# If a loop is already running, leave it alone.
+	# Verify the PID is actually our loop, not a recycled PID.
 	if [ -f "$pid_file" ]; then
 		local old_pid
 		old_pid="$(cat "$pid_file")"
-		if kill -0 "$old_pid" 2>/dev/null; then
+		if kill -0 "$old_pid" 2>/dev/null &&
+			grep -q "auto_save_loop" "/proc/$old_pid/cmdline" 2>/dev/null; then
 			frost_log INFO "auto-save loop already running (pid $old_pid)"
 			return
 		fi
+		rm -f "$pid_file"
 	fi
+
+	# Extract the socket path from $TMUX (format: /path/to/socket,pid,session)
+	local tmux_socket
+	tmux_socket="$(echo "$TMUX" | cut -d, -f1)"
 
 	# Launch via setsid into a dedicated script that closes all inherited
 	# fds — this prevents tmux's run-shell pipe from staying open, which
 	# would block TPM installs and config reloads.
 	setsid "$CURRENT_DIR/scripts/auto_save_loop.sh" \
-		"$pid_file" "$((interval * 60))" "$freeze_script" &
+		"$pid_file" "$((interval * 60))" "$freeze_script" "$tmux_socket" &
 	frost_log INFO "auto-save loop started (interval ${interval}m)"
 }
 
