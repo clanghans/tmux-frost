@@ -81,7 +81,8 @@ setup_auto_save() {
 			sleep "$((interval * 60))"
 			"$freeze_script" quiet
 		done
-	) &
+	) </dev/null >/dev/null 2>&1 &
+	disown
 	echo $! > "$pid_file"
 	frost_log INFO "auto-save loop started (pid $!, interval ${interval}m)"
 }
