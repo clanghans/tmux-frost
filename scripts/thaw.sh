@@ -66,6 +66,7 @@ restore_all_panes() {
 	fi
 
 	local restored_session_0=false
+	local -A seen_windows
 
 	while IFS=$d read -r line_type session_name window_number window_active pane_index pane_title dir pane_active; do
 		[ "$line_type" = "pane" ] || continue
@@ -76,12 +77,19 @@ restore_all_panes() {
 			restored_session_0=true
 		fi
 
+		local window_key="${session_name}:${window_number}"
+
 		if ! session_exists "$session_name"; then
 			new_session "$session_name" "$window_number" "$dir"
-			# first pane already created by new-session — just set title
+			seen_windows["$window_key"]=1
 		elif ! window_exists "$session_name" "$window_number"; then
 			new_window "$session_name" "$window_number" "$dir"
-			# first pane already created by new-window — just set title
+			seen_windows["$window_key"]=1
+		elif [ -z "${seen_windows[$window_key]+x}" ]; then
+			# Window already existed before restore — reuse its pane
+			# instead of splitting (which would create a duplicate).
+			tmux respawn-pane -k -t "${session_name}:${window_number}" -c "$dir"
+			seen_windows["$window_key"]=1
 		else
 			new_pane "$session_name" "$window_number" "$dir"
 		fi
