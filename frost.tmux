@@ -20,11 +20,7 @@ set_freeze_binding() {
 set_thaw_binding() {
 	local key
 	key="$(get_tmux_option "@frost-restore-key" "C-r")"
-	# run-shell -b launches thaw in background, wait-for blocks the client
-	# until thaw signals completion — making tmux "busy" during restore.
-	tmux bind-key "$key" \
-		run-shell -b "'$CURRENT_DIR/scripts/thaw.sh' ; tmux wait-for -S frost-thaw" \; \
-		wait-for frost-thaw
+	tmux bind-key "$key" run-shell "'$CURRENT_DIR/scripts/thaw.sh'"
 }
 
 # ── Auto-save ───────────────────────────────────────────────────────
