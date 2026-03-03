@@ -13,6 +13,19 @@ SOCKET="/tmp/tmux-frost-test-$$"
 SAVE_DIR="/tmp/tmux-frost-test-saves-$$"
 SESSION="frost-test"
 
+# Kill any orphaned test servers from previous interrupted runs
+for orphan_sock in /tmp/tmux-frost-test-[0-9]*; do
+    [ -S "$orphan_sock" ] || continue
+    [ "$orphan_sock" = "$SOCKET" ] && continue
+    tmux -S "$orphan_sock" kill-server 2>/dev/null || true
+    rm -f "$orphan_sock"
+done
+for orphan_dir in /tmp/tmux-frost-test-saves-[0-9]*; do
+    [ -d "$orphan_dir" ] || continue
+    [ "$orphan_dir" = "$SAVE_DIR" ] && continue
+    rm -rf "$orphan_dir"
+done
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -42,7 +55,13 @@ fresh_server() {
     T kill-server 2>/dev/null || true
     rm -rf "$SAVE_DIR"
     mkdir -p "$SAVE_DIR"
-    sleep 0.1
+    # Wait for socket to be fully released after kill-server
+    local retries=0
+    while [ -S "$SOCKET" ] && [ $retries -lt 10 ]; do
+        sleep 0.1
+        retries=$((retries + 1))
+    done
+    rm -f "$SOCKET"
     T new-session -d -s "$SESSION" -x 200 -y 50
 }
 
