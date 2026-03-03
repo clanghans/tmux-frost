@@ -74,7 +74,7 @@ validate_layout() {
 # ── Dump functions ──────────────────────────────────────────────────
 
 dump_panes() {
-	tmux list-panes -a -F "$(pane_format)"
+	tmux list-panes -a -F "$(pane_format)" | sort -t "$d" -k2,2 -k3,3n -k5,5n
 }
 
 dump_windows() {
@@ -170,4 +170,4 @@ main() {
 		display_message "Frost: saved!"
 	fi
 }
-main
+mai

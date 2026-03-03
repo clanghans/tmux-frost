@@ -67,34 +67,46 @@ restore_all_panes() {
 
 	local restored_session_0=false
 	local -A seen_windows
+	local prev_session=""
+	local prev_session_created=false
 
 	while IFS=$d read -r line_type session_name window_number window_active pane_index pane_title dir pane_active; do
 		[ "$line_type" = "pane" ] || continue
 		dir="$(remove_first_char "$dir")"
 		dir="${dir/#\~/$HOME}"
-
-		if [ "$session_name" = "0" ]; then
-			restored_session_0=true
-		fi
+		[ "$session_name" = "0" ] && restored_session_0=true
 
 		local window_key="${session_name}:${window_number}"
 
-		if ! session_exists "$session_name"; then
-			new_session "$session_name" "$window_number" "$dir"
-			seen_windows["$window_key"]=1
-		elif ! window_exists "$session_name" "$window_number"; then
-			new_window "$session_name" "$window_number" "$dir"
-			seen_windows["$window_key"]=1
-		elif [ -z "${seen_windows[$window_key]+x}" ]; then
-			# Window already existed before restore — reuse its pane
-			# instead of splitting (which would create a duplicate).
-			tmux respawn-pane -k -t "${session_name}:${window_number}" -c "$dir"
-			seen_windows["$window_key"]=1
-		else
+		# 2nd+ pane in this window — just split
+		if [ -n "${seen_windows[$window_key]+x}" ]; then
 			new_pane "$session_name" "$window_number" "$dir"
+			tmux select-pane -t "${session_name}:${window_number}" -T "$pane_title" 2>/dev/null
+			continue
+		fi
+		seen_windows["$window_key"]=1
+
+		# New session — check existence once
+		if [ "$session_name" != "$prev_session" ]; then
+			prev_session="$session_name"
+			if [ "$restoring_from_scratch" = "true" ] || ! session_exists "$session_name"; then
+				new_session "$session_name" "$window_number" "$dir"
+				prev_session_created=true
+				tmux select-pane -t "${session_name}:${window_number}" -T "$pane_title" 2>/dev/null
+				continue
+			fi
+			prev_session_created=false
 		fi
 
-		# set pane title
+		# We created this session — windows can't pre-exist
+		if [ "$prev_session_created" = "true" ]; then
+			new_window "$session_name" "$window_number" "$dir"
+		# Pre-existing session — window might exist
+		elif window_exists "$session_name" "$window_number"; then
+			tmux respawn-pane -k -t "${session_name}:${window_number}" -c "$dir"
+		else
+			new_window "$session_name" "$window_number" "$dir"
+		fi
 		tmux select-pane -t "${session_name}:${window_number}" -T "$pane_title" 2>/dev/null
 	done < "$save_file"
 
