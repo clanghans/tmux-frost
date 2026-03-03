@@ -170,4 +170,4 @@ main() {
 		display_message "Frost: saved!"
 	fi
 }
-mai
+main
