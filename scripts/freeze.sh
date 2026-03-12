@@ -4,6 +4,7 @@
 #
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/helpers.sh
 source "$CURRENT_DIR/helpers.sh"
 
 # if "quiet" the script produces no tmux messages
@@ -106,7 +107,7 @@ remove_old_backups() {
 
 	# Collect all frost save files, sorted newest-first, skip the 5 newest
 	local -a files
-	files=($(ls -t "$dir"/frost_*.txt 2>/dev/null | tail -n +6))
+	mapfile -t files < <(ls -t "$dir"/frost_*.txt 2>/dev/null | tail -n +6)
 	[[ ${#files[@]} -eq 0 ]] && return
 
 	find "${files[@]}" -type f -mtime "+${delete_after}" -exec rm -f "{}" \; 2>/dev/null

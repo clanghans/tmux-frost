@@ -1,6 +1,6 @@
 # tmux-frost
 
-Minimal tmux session save/restore. Freeze your sessions, thaw them later.
+Freeze your tmux sessions, thaw them later. No status-bar hijacking, one plugin instead of two.
 
 ## Why
 
@@ -97,6 +97,8 @@ state	client_session	client_last_session
 
 Files are stored as `frost_YYYYMMDDTHHMMSS.txt` with a `last` symlink pointing to the most recent save.
 
+The version field is `1`. Format changes that would break existing files will increment this number. thaw rejects files with an unrecognised version header rather than silently producing a broken restore.
+
 ## How auto-restore works
 
 When the plugin loads, it registers a one-shot `session-created` hook. The first time a session is created (i.e. tmux just started), the hook checks if the server is fresh (only 1 pane exists) and a save file is available. If so, it runs thaw to restore the previous layout. The hook removes itself immediately so it never fires again during the server's lifetime.
@@ -104,6 +106,46 @@ When the plugin loads, it registers a one-shot `session-created` hook. The first
 ## How auto-save works
 
 Auto-save runs as a background loop that sleeps for the configured interval and then triggers a quiet freeze. The loop is started by `frost.tmux` when the plugin loads and is a child of the tmux server process, so it dies naturally when tmux exits. A PID file prevents duplicate loops on config reloads (`tmux source`).
+
+## Troubleshooting
+
+**Auto-restore didn't fire on startup**
+
+The one-shot hook only triggers when the server is truly fresh (exactly 1 pane). If another process already created a session before the hook fired, it won't run. Check that `@frost-auto-restore` is `'on'` and that you're starting a brand-new tmux server.
+
+**Auto-save doesn't seem to be running**
+
+Check whether the background loop is alive:
+
+```sh
+cat ~/.local/share/tmux/frost/.auto_save.pid | xargs kill -0 && echo running || echo dead
+```
+
+If dead, reload your config (`tmux source ~/.tmux.conf`) to restart the loop.
+
+**How to read the logs**
+
+frost writes a daily log to its save directory:
+
+```sh
+tail -f ~/.local/share/tmux/frost/frost_$(date +%Y-%m-%d).log
+```
+
+Logs include timestamps and INFO/WARN/ERROR levels for every freeze and thaw.
+
+**Restore produced the wrong sessions or nothing at all**
+
+thaw reads from the `last` symlink. Verify it points to the expected file:
+
+```sh
+ls -la ~/.local/share/tmux/frost/last
+```
+
+To restore from a specific save, update the symlink manually:
+
+```sh
+ln -fs frost_20250101T120000.txt ~/.local/share/tmux/frost/last
+```
 
 ## Running tests
 
@@ -114,5 +156,5 @@ Auto-save runs as a background loop that sleeps for the configured interval and 
 Tests run against an isolated tmux server socket and don't affect your running sessions.
 
 ## License
-
+Copyright (c) 2024 clanghans
 MIT

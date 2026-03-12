@@ -2,6 +2,7 @@
 
 # tmux-frost helpers — shared utilities for freeze and thaw
 
+# shellcheck disable=SC2034  # used by sourcing scripts (freeze.sh, thaw.sh)
 d=$'\t'
 
 default_frost_dir="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/frost"

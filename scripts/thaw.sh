@@ -4,6 +4,7 @@
 #
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/helpers.sh
 source "$CURRENT_DIR/helpers.sh"
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ restore_all_panes() {
 
 restore_window_properties() {
 	local save_file="$1"
+	# shellcheck disable=SC2034  # window_flags is a positional field, not used directly
 	while IFS=$d read -r line_type session_name window_number window_name window_active window_flags window_layout automatic_rename; do
 		[ "$line_type" = "window" ] || continue
 
@@ -147,6 +149,7 @@ restore_active_panes() {
 
 restore_active_windows() {
 	local save_file="$1"
+	# shellcheck disable=SC2034  # positional fields needed to reach window_active
 	while IFS=$d read -r line_type session_name window_number window_name window_active window_flags window_layout automatic_rename; do
 		[ "$line_type" = "window" ] || continue
 		[ "$window_active" = "1" ] || continue

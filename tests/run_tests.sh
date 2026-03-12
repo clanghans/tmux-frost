@@ -7,8 +7,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FROST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOCKET="/tmp/tmux-frost-test-$$"
 SAVE_DIR="/tmp/tmux-frost-test-saves-$$"
 SESSION="frost-test"
@@ -70,7 +68,8 @@ fresh_server() {
 d=$'\t'
 
 do_freeze() {
-    local save_file="$SAVE_DIR/frost_$(date +%Y%m%dT%H%M%S%N).txt"
+    local save_file
+    save_file="$SAVE_DIR/frost_$(date +%Y%m%dT%H%M%S%N).txt"
 
     echo "frost_version${d}1" > "$save_file"
 
@@ -107,6 +106,7 @@ do_thaw() {
     local first_session_window=""
     local created_sessions=""
 
+    # shellcheck disable=SC2034  # positional fields needed to reach r_dir
     while IFS=$'\t' read -r line_type r_session r_win r_winactive r_paneidx r_title r_dir r_paneactive; do
         [ "$line_type" = "pane" ] || continue
         r_dir="${r_dir#:}"
@@ -143,6 +143,7 @@ ${r_session}"
 
 do_apply_layouts() {
     local save_file="$1"
+    # shellcheck disable=SC2034  # positional fields needed to reach r_layout
     while IFS=$'\t' read -r line_type r_session r_win r_name r_active r_flags r_layout r_autorename; do
         [ "$line_type" = "window" ] || continue
         T select-layout -t "${r_session}:${r_win}" "$r_layout" 2>/dev/null || true
@@ -677,7 +678,7 @@ test_multiple_cycles() {
     T select-layout -t "$SESSION" tiled
 
     local save_file
-    for cycle in 1 2 3; do
+    for _ in 1 2 3; do
         save_file="$(do_freeze)"
         T kill-server 2>/dev/null || true
         sleep 0.1
