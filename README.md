@@ -42,7 +42,7 @@ Then reload tmux and press `prefix + I` to install.
 To pin to a specific release (recommended for stability):
 
 ```tmux
-set -g @plugin 'clanghans/tmux-frost#v1.0'
+set -g @plugin 'clanghans/tmux-frost#v1.1'
 ```
 
 TPM passes the tag to `git clone -b`, so this works for any release tag. Pinned installs won't update when you press `prefix + U` — to upgrade, change the tag and reinstall.
