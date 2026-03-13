@@ -158,7 +158,7 @@ ln -fs frost_20250101T120000.txt ~/.local/share/tmux/frost/last
 ## Running tests
 
 ```sh
-./tests/run_tests.sh
+make test
 ```
 
 Tests run against an isolated tmux server socket and don't affect your running sessions.
